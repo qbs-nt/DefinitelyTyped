@@ -19,10 +19,27 @@
 declare module 'react-jsonschema-form' {
     import * as React from 'react';
     import { JSONSchema6, JSONSchema6Type } from 'json-schema';
+    import { ErrorParameters as AjvErrorParameters } from 'ajv';
 
-    type ErrorSchema = {
-        [k: string]: ErrorSchema;
-    };
+    interface BaseInputWidgetRegistry {
+        BaseInput: BaseInputWidget; // FIXME-filters: make optional
+    }
+    interface NonBaseInputWidgetRegistry {
+      [name: string]: Widget;
+    }
+    type WidgetRegistry = BaseInputWidgetRegistry | NonBaseInputWidgetRegistry;
+
+    interface FieldRegistry { [name: string]: Field }
+
+    interface ErrorSchemaChildren {
+      [k: string]: ErrorSchema;
+    }
+
+    interface ErrorSchemaErrors {
+      __errors: string[];
+    }
+
+    type ErrorSchema = ErrorSchemaChildren | ErrorSchemaErrors;
 
     export interface FormProps<T> {
         schema: JSONSchema6;
@@ -30,8 +47,8 @@ declare module 'react-jsonschema-form' {
         uiSchema?: UiSchema;
         formData?: T;
         formContext?: any;
-        widgets?: { [name: string]: Widget };
-        fields?: { [name: string]: Field };
+        widgets?: WidgetRegistry;
+        fields?: FieldRegistry;
         noValidate?: boolean;
         noHtml5Validate?: boolean;
         showErrorList?: boolean;
@@ -41,13 +58,13 @@ declare module 'react-jsonschema-form' {
         onChange?: (e: IChangeEvent<T>, es?: ErrorSchema) => any;
         onError?: (e: any) => any;
         onFocus?: (id: string, value: boolean | number | string | null) => void;
-        onSubmit?: (e: ISubmitEvent<T>) => any;
+        onSubmit?: (e: ISubmitEvent<T>, originalSubmitEvent: React.FormEventHandler) => any;
         liveValidate?: boolean;
         FieldTemplate?: React.StatelessComponent<FieldTemplateProps>;
         ArrayFieldTemplate?: React.StatelessComponent<ArrayFieldTemplateProps>;
         ObjectFieldTemplate?: React.StatelessComponent<ObjectFieldTemplateProps>;
         safeRenderCompletion?: boolean;
-        transformErrors?: (errors: AjvError[]) => AjvError[];
+        transformErrors?: (errors: ValidationError[]) => ValidationError[];
         idPrefix?: string;
         additionalMetaSchemas?: ReadonlyArray<object>;
         customFormats?: { [k: string]: string | RegExp | ((data: string) => boolean) };
@@ -72,7 +89,7 @@ declare module 'react-jsonschema-form' {
             schema?: FormProps<T>['schema'],
             additionalMetaSchemas?: FormProps<T>['additionalMetaSchemas'],
             customFormats?: FormProps<T>['customFormats'],
-        ) => { errors: AjvError[]; errorSchema: ErrorSchema };
+        ) => { errors: ValidationError[]; errorSchema: ErrorSchema };
         onChange: (formData: T, newErrorSchema: ErrorSchema) => void;
         onBlur: (id: string, value: boolean | number | string | null) => void;
         submit: () => void;
@@ -107,7 +124,22 @@ declare module 'react-jsonschema-form' {
     } &
         FieldPath;
 
-    export interface WidgetProps
+      export interface GenericWidgetOptions{
+        [key: string]: boolean | number | string | object | null | undefined;
+      } 
+
+      export interface BaseInputWidgetOptions {
+        inputType?: BaseInputWidgetProps['type'];
+        emptyValue?: any;
+      }
+
+      export interface TextareaWidgetOptions {
+        emptyValue?: any;
+        rows?: number;
+        qbus_autoSize?: boolean | {minRows?: number, maxRows?: number}; // antd Input.TextArea AutoSizeType
+      }
+
+      export interface WidgetProps<O = GenericWidgetOptions>
         extends Pick<
             React.HTMLAttributes<HTMLElement>,
             Exclude<keyof React.HTMLAttributes<HTMLElement>, 'onBlur' | 'onFocus'>
@@ -120,7 +152,7 @@ declare module 'react-jsonschema-form' {
         readonly: boolean;
         autofocus: boolean;
         onChange: (value: any) => void;
-        options: { [key: string]: boolean | number | string | object | null };
+        options: O;
         formContext: any;
         onBlur: (id: string, value: boolean | number | string | null) => void;
         onFocus: (id: string, value: boolean | number | string | null) => void;
@@ -128,17 +160,65 @@ declare module 'react-jsonschema-form' {
         rawErrors: string[];
     }
 
-    export type Widget = React.StatelessComponent<WidgetProps> | React.ComponentClass<WidgetProps>;
+    export type Widget = React.ComponentType<WidgetProps<any>>;
+    type BaseInputWidget = React.ComponentType<BaseInputWidgetProps>;
+
+    // lib.dom.ts provides no strict definition for "type" attribute of <input> element
+    // Def taken from https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#Form_%3Cinput%3E_types as of Oct 31 2018:
+    type HTMLElementInputType =
+        | 'button' // A push button with no default behavior.
+        | 'checkbox' // A check box allowing single values to be selected/deselected.
+        | 'color' // [HTML5] A control for specifying a color. A color picker's UI has no required features other than accepting simple colors as text (more info).
+        | 'date' // [HTML5] A control for entering a date (year, month, and day, with no time).
+        | 'datetime-local' // [HTML5] A control for entering a date and time, with no time zone.
+        | 'email' // [HTML5] A field for editing an e-mail address.
+        | 'file' // A control that lets the user select a file. Use the accept attribute to define the types of files that the control can select.
+        | 'hidden' // A control that is not displayed but whose value is submitted to the server.
+        | 'image' // A graphical submit button. You must use the src attribute to define the source of the image and the alt attribute to define alternative text. You can use the height and width attributes to define the size of the image in pixels.
+        | 'month' // [HTML5] A control for entering a month and year, with no time zone.
+        | 'number' // [HTML5] A control for entering a number.
+        | 'password' // A single-line text field whose value is obscured. Use the maxlength and minlength attributes to specify the maximum length of the value that can be entered.
+        | 'radio' // A radio button, allowing a single value to be selected out of multiple choices.
+        | 'range' // [HTML5] A control for entering a number whose exact value is not important.
+        | 'reset' // A button that resets the contents of the form to default values.
+        | 'search' // [HTML5] A single-line text field for entering search strings. Line-breaks are automatically removed from the input value.
+        | 'submit' // A button that submits the form.
+        | 'tel' // [HTML5] A control for entering a telephone number.
+        | 'text' // A single-line text field. Line-breaks are automatically removed from the input value.
+        | 'time' // [HTML5] A control for entering a time value with no time zone.
+        | 'url' // [HTML5] A field for entering a URL.
+        | 'week' // [HTML5] A control for entering a date consisting of a week-year number and a week number with no time zone.
+        | 'datetime'; // [OBSOLETE] A control for entering a date and time (hour, minute, second, and fraction of a second) based on UTC time zone. This feature has been removed from WHATWG HTML.
+
+    // BaseInput is a Widget, not a Field; but a Widget with
+    // additional props
+    export interface BaseInputWidgetProps extends WidgetProps<BaseInputWidgetOptions>, Pick<HTMLInputElement, 'step'> {
+        // Restrict to the <input> types used in react-jsonschema-form as type prop for
+        // BaseInput component as of Oct 31 2018:
+        type?: HTMLElementInputType &
+            (
+                | 'hidden'
+                | 'color'
+                | 'date'
+                | 'datetime-local'
+                | 'email'
+                | 'number'
+                | 'password'
+                | 'range'
+                | 'text'
+                | 'url');
+    }
 
     export interface FieldProps<T = any>
-        extends Pick<React.HTMLAttributes<HTMLElement>, Exclude<keyof React.HTMLAttributes<HTMLElement>, 'onBlur'>> {
+        extends Pick<React.HTMLAttributes<HTMLElement>, Exclude<keyof React.HTMLAttributes<HTMLElement>, 'onBlur' | 'onFocus'>> {
         schema: JSONSchema6;
         uiSchema: UiSchema;
         idSchema: IdSchema;
-        formData: T;
+        formData: T | undefined;
         errorSchema: ErrorSchema;
         onChange: (e: IChangeEvent<T> | any, es?: ErrorSchema) => any;
         onBlur: (id: string, value: boolean | number | string | null) => void;
+        onFocus: (id: string, value: boolean | number | string | null) => void;
         registry: {
             fields: { [name: string]: Field };
             widgets: { [name: string]: Widget };
@@ -152,6 +232,7 @@ declare module 'react-jsonschema-form' {
         required: boolean;
         name: string;
         [prop: string]: any;
+        description?: React.ReactChild;
     }
 
     export type Field = React.StatelessComponent<FieldProps> | React.ComponentClass<FieldProps>;
@@ -218,28 +299,33 @@ declare module 'react-jsonschema-form' {
         properties: {
             content: React.ReactElement;
             name: string;
-            disabled: boolean;
             readonly: boolean;
+            disabled: boolean;
+            required: boolean;
         }[];
+        readonly: boolean;
+        disabled: boolean;
         required: boolean;
-        schema: JSONSchema6;
-        uiSchema: UiSchema;
         idSchema: IdSchema;
+        uiSchema: UiSchema;
+        schema: JSONSchema6;
         formData: T;
         formContext: any;
+        onAddClick: (schema: JSONSchema6) => void;
     };
 
-    export type AjvError = {
-        message: string;
+    export type ValidationError = {
         name: string;
-        params: any;
+        message: string;
+        params: AjvErrorParameters;
         property: string;
         stack: string;
+        schemaPath: string;
     };
 
     export type ErrorListProps = {
         errorSchema: FormValidation;
-        errors: AjvError[];
+        errors: ValidationError[];
         formContext: any;
         schema: JSONSchema6;
         uiSchema: UiSchema;
@@ -248,7 +334,7 @@ declare module 'react-jsonschema-form' {
     export interface IChangeEvent<T = any> {
         edit: boolean;
         formData: T;
-        errors: AjvError[];
+        errors: ValidationError[];
         errorSchema: FormValidation;
         idSchema: IdSchema;
         schema: JSONSchema6;
@@ -440,7 +526,8 @@ declare module 'react-jsonschema-form/lib/utils' {
 
 declare module 'react-jsonschema-form/lib/validate' {
     import { JSONSchema6Definition } from 'json-schema';
-    import { AjvError, ErrorSchema, FormProps } from 'react-jsonschema-form';
+    // import { ValidationError } from 'react-jsonschema-form';
+    import { ValidationError, ErrorSchema, FormProps } from 'react-jsonschema-form';
 
     export default function validateFormData<T = any>(
         formData: T,
@@ -449,5 +536,20 @@ declare module 'react-jsonschema-form/lib/validate' {
         transformErrors?: FormProps<T>['transformErrors'],
         additionalMetaSchemas?: FormProps<T>['additionalMetaSchemas'],
         customFormats?: FormProps<T>['customFormats'],
-    ): { errors: AjvError[]; errorSchema: ErrorSchema };
+    // ): ValidationError[];
+    ): { errors: ValidationError[]; errorSchema: ErrorSchema };
+}
+
+declare module 'react-jsonschema-form/lib/components/AddButton' {
+    import * as React from 'react';
+    import { JSONSchema6 } from 'json-schema';
+
+    interface AddButtonProps {
+        className: string;
+        onClick: (schema: JSONSchema6) => void;
+        disabled: boolean;
+    }
+
+    const AddButton: React.SFC<AddButtonProps>;
+    export default AddButton;
 }
