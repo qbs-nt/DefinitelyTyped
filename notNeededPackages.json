@@ -1603,6 +1603,12 @@
             "asOfVersion": "2.7.0"
         },
         {
+            "libraryName": "generate-password",
+            "typingsPackageName": "generate-password",
+            "sourceRepoURL": "https://github.com/brendanashworth/generate-password.git",
+            "asOfVersion": "1.5.1"
+        },
+        {
             "libraryName": "geolib",
             "typingsPackageName": "geolib",
             "sourceRepoURL": "https://github.com/manuelbieh/Geolib",
@@ -2845,12 +2851,6 @@
             "asOfVersion": "1.0.0"
         },
         {
-            "libraryName": "@material/ripple",
-            "typingsPackageName": "material__ripple",
-            "sourceRepoURL": "https://github.com/material-components/material-components-web/tree/master/packages/mdc-ripple",
-            "asOfVersion": "1.0.0"
-        },
-        {
             "libraryName": "@material/checkbox",
             "typingsPackageName": "material__checkbox",
             "sourceRepoURL": "https://github.com/material-components/material-components-web/tree/master/packages/mdc-checkbox",
@@ -2938,6 +2938,12 @@
             "libraryName": "@material/radio",
             "typingsPackageName": "material__radio",
             "sourceRepoURL": "https://github.com/material-components/material-components-web/tree/master/packages/mdc-radio",
+            "asOfVersion": "1.0.0"
+        },
+        {
+            "libraryName": "@material/ripple",
+            "typingsPackageName": "material__ripple",
+            "sourceRepoURL": "https://github.com/material-components/material-components-web/tree/master/packages/mdc-ripple",
             "asOfVersion": "1.0.0"
         },
         {
